@@ -1,3 +1,24 @@
+# XMPP4R-Observable - An easy-to-use Jabber Client library with PubSub support
+# Copyright (c) 2009 by Pablo Lorenzoni <pablo@propus.com.br>
+#
+# This is based on XMPP4R-Simple (http://github.com/blaine/xmpp4r-simple) but
+# we implement the notification of messages using a modified form of Ruby's
+# Observable module instead of a queue.
+#
+# Jabber::Observable is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# Jabber::Simple is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# Jabber::Simple; if not, write to the Free Software Foundation, Inc., 51
+# Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
 require 'time'
 require 'rubygems'
 require 'xmpp4r'
@@ -7,15 +28,15 @@ require 'xmpp4r/pubsub'
 require 'xmpp4r/pubsub/helper/servicehelper'
 require 'xmpp4r/pubsub/helper/nodebrowser'
 require 'xmpp4r/pubsub/helper/nodehelper'
+
+# This will provide us our Notifications system
 require 'fine_observer'
 
 module Jabber
 
-	class ConnectionError < StandardError #:nodoc:
-	end
+	class ConnectionError < StandardError; end #:nodoc:
 
-	class NotConnected < StandardError #:nodoc:
-	end
+	class NotConnected < StandardError; end #:nodoc:
 
 	class Contact #:nodoc:
 
@@ -37,13 +58,13 @@ module Jabber
 		end
 
 		def ask_for_authorization!
-			subscription_request = Presence.new.set_type(:subscribe)
+			subscription_request = Jabber::Presence.new.set_type(:subscribe)
 			subscription_request.to = jid
 			client.send!(subscription_request)
 		end
 
 		def unsubscribe!
-			unsubscription_request = Presence.new.set_type(:unsubscribe)
+			unsubscription_request = Jabber::Presence.new.set_type(:unsubscribe)
 			unsubscription_request.to = jid
 			client.send!(unsubscription_request)
 			client.send!(unsubscription_request.set_type(:unsubscribed))
@@ -64,15 +85,18 @@ module Jabber
 		end
 	end
 
+	# Jabber::Observable - Creates observable Jabber Clients
 	class Observable
 
+		# Jabber::Observable::PubSub - Convenience subclass to deal with PubSub
 		class PubSub
-			class NoService < StandardError #:nodoc:
-			end
+			class NoService < StandardError; end #:nodoc:
 
-			class AlreadySet < StandardError #:nodoc:
-			end
+			class AlreadySet < StandardError; end #:nodoc:
 
+			# Creates a new PubSub object
+			#
+			# observable:: points a Jabber::Observable object
 			def initialize(observable)
 				@observable = observable
 
@@ -86,7 +110,7 @@ module Jabber
 				end
 			end
 
-			def inspect
+			def inspect	#:nodoc:
 				if has_service?
 					"<Jabber::Observable::PubSub:0x#{object_id.to_s(16)} @service_jid=#{@service_jid}>"
 				else
@@ -213,7 +237,7 @@ module Jabber
 	
 			private
 	
-			def find_subids_for(node)
+			def find_subids_for(node) #:nodoc:
 				ret = []
 				subscriptions.each do |subscription|
 					if subscription.node == node
@@ -223,12 +247,15 @@ module Jabber
 				return ret
 			end
 
-			def raise_noservice
+			def raise_noservice #:nodoc:
 				raise NoService, "Have you forgot to call #set_service ?"
 			end
-
 		end
 
+		# Jabber::Observable::Subscriptions - convenience class to deal with
+		# Presence subscriptions
+		#
+		# observable:: points to a Jabber::Observable object
 		class Subscriptions
 			def initialize(observable)
 				@observable = observable
@@ -241,11 +268,11 @@ module Jabber
 			#
 			# Example usage:
 			# 
-			#	 jabber_simple.add("friend@friendosaurus.com")
+			#	 jabber_observable.subs.add("friend@friendosaurus.com")
 			#
 			# Because the authorization process might take a few seconds, or might
 			# never happen depending on when (and if) the user accepts your
-			# request, results are placed in the Jabber::Simple#new_subscriptions queue.
+			# request, results are notified to observers of :new_subscription
 			def add(*jids)
 				@observable.contacts(*jids) do |friend|
 					next if subscribed_to? friend
@@ -279,18 +306,17 @@ module Jabber
 			def accept=(accept_status)
 				@accept=accept_status
 			end
-
 		end
 
 		include FineObservable
 
 		attr_reader :subs, :pubsub, :jid
 
-		# Create a new Jabber::Simple client. You will be automatically connected
+		# Create a new Jabber::Observable client. You will be automatically connected
 		# to the Jabber server and your status message will be set to the string
 		# passed in as the status_message argument.
 		#
-		# jabber = Jabber::Simple.new("me@example.com", "password", "Chat with me - Please!")
+		# jabber = Jabber::Observable.new("me@example.com", "password", "Chat with me - Please!")
 		def initialize(jid, password, status = nil, status_message = "Available", host = nil, port=5222)
 			# Basic stuff
 			@jid = jid
@@ -314,10 +340,11 @@ module Jabber
 			@pubsub = PubSub.new(self)
 		end
 
-		def inspect # :nodoc
+		def inspect # :nodoc:
 			"<Jabber::Observable:0x#{object_id.to_s(16)} @jid=#{@jid}, @delivered_messages=#{@delivered_messages}, @deferred_messages = #{@deferred_messages.length}, @observer_count=#{observer_count}, @notification_count=#{notification_count}, @pubsub=#{@pubsub.inspect}>"
 		end
 
+		# Count the registered observers in each thing
 		def observer_count
 			h = {}
 			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each { |thing|
@@ -326,6 +353,7 @@ module Jabber
 			h
 		end
 
+		# Count the notifications really send for each thing
 		def notification_count
 			h = {}
 			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each { |thing|
@@ -333,6 +361,7 @@ module Jabber
 			}
 			h
 		end
+
 		# Send a message to jabber user jid.
 		#
 		# Valid message types are:
@@ -345,7 +374,7 @@ module Jabber
 		#
 		# If the recipient is not in your contacts list, the message will be queued
 		# for later delivery, and the Contact will be automatically asked for
-		# authorization (see Jabber::Simple#add).
+		# authorization (see Jabber::Observable#add).
 		#
 		# message should be a string or a valid Jabber::Message object. In either case,
 		# the message recipient will be set to jid.
@@ -470,10 +499,15 @@ module Jabber
 			@deferred_messages.enq msg
 		end
 
+		# Sets the maximum time to wait for a message to be delivered (in
+		# seconds). It will be removed of the queue afterwards.
+
 		def deferred_max_wait=(seconds)
 			@deferred_max_wait = seconds
 		end
 
+		# Get the maximum time to wait for a message to be delivered. Default: 600
+		# seconds (10 minutes).
 		def deferred_max_wait
 			@deferred_max_wait || 600
 		end
@@ -490,7 +524,7 @@ module Jabber
 		end
 
 		def connect!
-			raise ConnectionError, "Connections are disabled - use Jabber::Simple::force_connect() to reconnect." if @disconnected
+			raise ConnectionError, "Connections are disabled - use Jabber::Observable::force_connect() to reconnect." if @disconnected
 			# Pre-connect
 			@connect_mutex ||= Mutex.new
 
@@ -579,7 +613,7 @@ module Jabber
 		def start_deferred_delivery_thread #:nodoc:
 			@deferred_delivery_thread = Thread.new {
 				loop {
-					sleep 1 while @deferred_messages.empty?
+					sleep 3 while @deferred_messages.empty?
 					message = @deferred_messages.deq
 					if subscribed_to?(message[:to])
 						deliver(message[:to], message[:message], message[:type])
