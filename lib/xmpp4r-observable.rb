@@ -17,15 +17,7 @@ module Jabber
 	class NotConnected < StandardError #:nodoc:
 	end
 
-	class NoPubSubService < StandardError #:nodoc:
-	end
-
-	class AlreadySet < StandardError #:nodoc:
-	end
-
 	class Contact #:nodoc:
-
-		include DRb::DRbUndumped if defined?(DRb::DRbUndumped)
 
 		def initialize(client, jid)
 			@jid = jid.respond_to?(:resource) ? jid : JID.new(jid)
@@ -33,7 +25,7 @@ module Jabber
 		end
 
 		def inspect
-			"Jabber::Contact #{jid.to_s}"
+			"<Jabber::Contact:0x#{object_id.to_s(16)} @jid=#{jid.to_s}>"
 		end
 
 		def subscribed?
@@ -74,9 +66,225 @@ module Jabber
 
 	class Observable
 
+		class PubSub
+			class NoService < StandardError #:nodoc:
+			end
+
+			class AlreadySet < StandardError #:nodoc:
+			end
+
+			def initialize(observable)
+				@observable = observable
+
+				@helper = @service_jid = nil
+				begin
+					domain = Jabber::JID.new(@observable.jid).domain
+					@service_jid = "pubsub." + domain
+					set_service(@service_jid)
+				rescue
+					@helper = @service_jid = nil
+				end
+			end
+
+			def inspect
+				if has_service?
+					"<Jabber::Observable::PubSub:0x#{object_id.to_s(16)} @service_jid=#{@service_jid}>"
+				else
+					"<Jabber::Observable::PubSub:0x#{object_id.to_s(16)} @has_service?=false>"
+				end
+			end
+
+			# Checks if the PubSub service is set
+			def has_service?
+				! @helper.nil?
+			end
+	
+			# Sets the PubSub service. Just one service is allowed.
+			def set_service(service)
+				raise NotConnected, "You are not connected" if ! @observable.connected?
+				raise AlreadySet, "You already have a PubSub service (#{@service_jid})." if has_service?
+				@helper = Jabber::PubSub::ServiceHelper.new(@observable.client, service)
+				@service_jid = service
+	
+				@helper.add_event_callback do |event|
+					@observable.changed(:event)
+					@observable.notify_observers(:event, event)
+				end
+			end
+	
+			# Subscribe to a node.
+			def subscribe_to(node)
+				raise_noservice if ! has_service?
+				@helper.subscribe_to(node)
+			end
+	
+			# Unsubscribe from a node.
+			def unsubscribe_from(node)
+				raise_noservice if ! has_service?
+	
+				# FIXME
+				# @helper.unsubscribe_from(node)
+				# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+				# The above should just work, but I had to reimplement it since XMPP4R doesn't support subids
+				# and OpenFire (the Jabber Server I am testing against) seems to require it.
+	
+				subids = find_subids_for(node)
+				return if subids.empty?
+	
+				subids.each do |subid|
+					iq = Jabber::Iq.new(:set, @service_jid)
+					iq.add(Jabber::PubSub::IqPubSub.new)
+					iq.from = @jid
+					unsub = REXML::Element.new('unsubscribe')
+					unsub.attributes['node'] = node
+					unsub.attributes['jid'] = @jid
+					unsub.attributes['subid'] = subid
+					iq.pubsub.add(unsub)
+					res = nil
+					@observable.client.send_with_id(iq) do |reply|
+						res = reply.kind_of?(Jabber::Iq) and reply.type == :result
+					end # @stream.send_with_id(iq)
+				end
+			end
+	
+			# Return the subscriptions we have in the configured PubSub service.
+			def subscriptions
+				raise_noservice if ! has_service?
+				@helper.get_subscriptions_from_all_nodes()
+			end
+	
+			# Create a PubSub node (Lots of options still have to be encoded!)
+			def create_node(node)
+				raise_noservice if ! has_service?
+				@helper.create_node(node)
+			end
+	
+			# Return an array of noes I own
+			def my_nodes
+				ret = []
+				subscriptions.each do |sub|
+					ret << sub.node if sub.attributes['affiliation'] == 'owner'
+				end
+				return ret
+			end
+	
+			# Delete a PubSub node (Lots of options still have to be encoded!)
+			def delete_node(node)
+				raise_noservice if ! has_service?
+				@helper.delete_node(node)
+			end
+	
+			# Publish an Item. This infers an item of Jabber::PubSub::Item kind is passed
+			def publish_item(node, item)
+				raise_noservice if ! has_service?
+				@helper.publish_item_to(node, item)
+			end
+	
+			# Publish Simple Item. This is an item with one element and some text to it.
+			def publish_simple_item(node, text)
+				raise_noservice if ! has_service?
+	
+				item = Jabber::PubSub::Item.new
+				xml = REXML::Element.new('value')
+				xml.text = text
+				item.add(xml)
+				publish_item(node, item)
+			end
+	
+			# Publish atom Item. This is an item with one atom entry with title, body and time.
+			def publish_atom_item(node, title, body, time = Time.now)
+				raise_noservice if ! has_service?
+	
+				item = Jabber::PubSub::Item.new
+				entry = REXML::Element.new('entry')
+				entry.add_namespace("http://www.w3.org/2005/Atom")
+				mytitle = REXML::Element.new('title')
+				mytitle.text = title
+				entry.add(mytitle)
+				mybody = REXML::Element.new('body')
+				mybody.text = body
+				entry.add(mybody)
+				published = REXML::Element.new("published")
+				published.text = time.utc.iso8601
+				entry.add(published)
+				item.add(entry)
+				publish_item(node, item)
+			end
+	
+			private
+	
+			def find_subids_for(node)
+				ret = []
+				subscriptions.each do |subscription|
+					if subscription.node == node
+						ret << subscription.subid
+					end
+				end
+				return ret
+			end
+
+			def raise_noservice
+				raise NoService, "Have you forgot to call #set_service ?"
+			end
+
+		end
+
+		class Subscriptions
+			def initialize(observable)
+				@observable = observable
+			end
+
+			# Ask the users specified by jids for authorization (i.e., ask them to add
+			# you to their contact list). If you are already in the user's contact list,
+			# add() will not attempt to re-request authorization. In order to force
+			# re-authorization, first remove() the user, then re-add them.
+			#
+			# Example usage:
+			# 
+			#	 jabber_simple.add("friend@friendosaurus.com")
+			#
+			# Because the authorization process might take a few seconds, or might
+			# never happen depending on when (and if) the user accepts your
+			# request, results are placed in the Jabber::Simple#new_subscriptions queue.
+			def add(*jids)
+				@observable.contacts(*jids) do |friend|
+					next if subscribed_to? friend
+					friend.ask_for_authorization!
+				end
+			end
+	
+			# Remove the jabber users specified by jids from the contact list.
+			def remove(*jids)
+				@observable.contacts(*jids) do |unfriend|
+					unfriend.unsubscribe!
+				end
+			end
+	
+			# Returns true if this Jabber account is subscribed to status updates for
+			# the jabber user jid, false otherwise.
+			def subscribed_to?(jid)
+				@observable.contacts(jid) do |contact|
+					return contact.subscribed?
+				end
+			end
+
+			# Returns true if auto-accept subscriptions (friend requests) is enabled
+			# (default), false otherwise.
+			def accept?
+				@accept = true if @accept.nil?
+				@accept
+			end
+	
+			# Change whether or not subscriptions (friend requests) are automatically accepted.
+			def accept=(accept_status)
+				@accept=accept_status
+			end
+
+		end
+
 		include FineObservable
 
-		include DRb::DRbUndumped if defined?(DRb::DRbUndumped)
+		attr_reader :subs, :pubsub, :jid
 
 		# Create a new Jabber::Simple client. You will be automatically connected
 		# to the Jabber server and your status message will be set to the string
@@ -91,29 +299,40 @@ module Jabber
 			@port = port
 			@disconnected = false
 
-			status(status, status_message)
+			# Message dealing
 			@delivered_messages = 0
 			@deferred_messages = Queue.new
 			start_deferred_delivery_thread
 
-			@pubsub = @pubsub_jid = nil
-			begin
-				domain = Jabber::JID.new(@jid).domain
-				@pubsub_jid = "pubsub." + domain
-				set_pubsub_service(@pubsub_jid)
-			rescue
-				@pubsub = @pubsub_jid = nil
-			end
+			# Tell everybody I am here
+			status(status, status_message)
+
+			# Subscription Accessor
+			@subs = Subscriptions.new(self)
+
+			# PubSub Accessor
+			@pubsub = PubSub.new(self)
 		end
 
 		def inspect # :nodoc
-			observers = "Observers Count: :message => #{count_observers(:message)}, :presence => #{count_observers(:presence)}, :iq => #{count_observers(:iq)}, :new_subscription => #{count_observers(:new_subscription)}, :subscription_request => #{count_observers(:subscription_request)}, :event => #{count_observers(:event)}"
-			notifications = "Notifications Count: :message => #{count_notifications(:message)}, :presence => #{count_notifications(:presence)}, :iq => #{count_notifications(:iq)}, :new_subscription => #{count_notifications(:new_subscription)}, :subscription_request => #{count_notifications(:subscription_request)}, :event => #{count_notifications(:event)}"
-			pubsub = "PubSub Service: has_pubsub? => #{has_pubsub?}, pubsub_jid => #{@pubsub_jid}"
-
-			"Jabber::Observable #{@jid}\ndelivered_messages = #{@delivered_messages}, deferred_messages = #{@deferred_messages.length}\n#{observers}\n#{notifications}\n#{pubsub}"
+			"<Jabber::Observable:0x#{object_id.to_s(16)} @jid=#{@jid}, @delivered_messages=#{@delivered_messages}, @deferred_messages = #{@deferred_messages.length}, @observer_count=#{observer_count}, @notification_count=#{notification_count}, @pubsub=#{@pubsub.inspect}>"
 		end
 
+		def observer_count
+			h = {}
+			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each { |thing|
+				h[thing] = count_observers(thing)
+			}
+			h
+		end
+
+		def notification_count
+			h = {}
+			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each { |thing|
+				h[thing] = count_notifications(thing)
+			}
+			h
+		end
 		# Send a message to jabber user jid.
 		#
 		# Valid message types are:
@@ -163,42 +382,8 @@ module Jabber
 		def status(presence, message)
 			@presence = presence
 			@status_message = message
-			stat_msg = Presence.new(@presence, @status_message)
+			stat_msg = Jabber::Presence.new(@presence, @status_message)
 			send!(stat_msg)
-		end
-
-		# Ask the users specified by jids for authorization (i.e., ask them to add
-		# you to their contact list). If you are already in the user's contact list,
-		# add() will not attempt to re-request authorization. In order to force
-		# re-authorization, first remove() the user, then re-add them.
-		#
-		# Example usage:
-		# 
-		#	 jabber_simple.add("friend@friendosaurus.com")
-		#
-		# Because the authorization process might take a few seconds, or might
-		# never happen depending on when (and if) the user accepts your
-		# request, results are placed in the Jabber::Simple#new_subscriptions queue.
-		def add(*jids)
-			contacts(*jids) do |friend|
-				next if subscribed_to? friend
-				friend.ask_for_authorization!
-			end
-		end
-
-		# Remove the jabber users specified by jids from the contact list.
-		def remove(*jids)
-			contacts(*jids) do |unfriend|
-				unfriend.unsubscribe!
-			end
-		end
-
-		# Returns true if this Jabber account is subscribed to status updates for
-		# the jabber user jid, false otherwise.
-		def subscribed_to?(jid)
-			contacts(jid) do |contact|
-				return contact.subscribed?
-			end
 		end
 
 		# If contacts is a single contact, returns a Jabber::Contact object
@@ -228,18 +413,6 @@ module Jabber
 			@client ||= nil
 			connected = @client.respond_to?(:is_connected?) && @client.is_connected?
 			return connected
-		end
-
-		# Returns true if auto-accept subscriptions (friend requests) is enabled
-		# (default), false otherwise.
-		def accept_subscriptions?
-			@accept_subscriptions = true if @accept_subscriptions.nil?
-			@accept_subscriptions
-		end
-
-		# Change whether or not subscriptions (friend requests) are automatically accepted.
-		def accept_subscriptions=(accept_status)
-			@accept_subscriptions = accept_status
 		end
 
 		# Direct access to the underlying Roster helper.
@@ -305,134 +478,7 @@ module Jabber
 			@deferred_max_wait || 600
 		end
 
-		# Checks if the PubSub service is set
-		def has_pubsub?
-			! @pubsub.nil?
-		end
-
-		# Sets the PubSub service. Just one service is allowed.
-		def set_pubsub_service(service)
-			raise NotConnected, "You are not connected" if @disconnected
-			raise AlreadySet, "You already have a PubSub service. Currently it's not allowed to have more." if has_pubsub?
-			@pubsub = PubSub::ServiceHelper.new(@client, service)
-			@pubsub_jid = service
-
-			@pubsub.add_event_callback do |event|
-				changed(:event)
-				notify_observers(:event, event)
-			end
-		end
-
-		# Subscribe to a node.
-		def pubsubscribe_to(node)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-			@pubsub.subscribe_to(node)
-		end
-
-		# Unsubscribe from a node.
-		def pubunsubscribe_from(node)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-
-			# FIXME
-			# @pubsub.unsubscribe_from(node)
-			# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			# The above should just work, but I had to reimplement it since XMPP4R doesn't support subids
-			# and OpenFire (the Jabber Server I am testing against) seems to require it.
-
-			subids = find_subids_for(node)
-			return if subids.empty?
-
-			subids.each do |subid|
-				iq = Jabber::Iq.new(:set, @pubsub_jid)
-				iq.add(Jabber::PubSub::IqPubSub.new)
-				iq.from = @jid
-				unsub = REXML::Element.new('unsubscribe')
-				unsub.attributes['node'] = node
-				unsub.attributes['jid'] = @jid
-				unsub.attributes['subid'] = subid
-				iq.pubsub.add(unsub)
-				res = nil
-				@client.send_with_id(iq) do |reply|
-					res = reply.kind_of?(Jabber::Iq) and reply.type == :result
-				end # @stream.send_with_id(iq)
-			end
-		end
-
-		# Return the subscriptions we have in the configured PubSub service.
-		def pubsubscriptions
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-			@pubsub.get_subscriptions_from_all_nodes()
-		end
-
-		# Create a PubSub node (Lots of options still have to be encoded!)
-		def create_node(node)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-			@pubsub.create_node(node)
-		end
-
-		# Return an array of noes I own
-		def my_nodes
-			ret = []
-			pubsubscriptions.each do |sub|
-				ret << sub.node if sub.attributes['affiliation'] == 'owner'
-			end
-			return ret
-		end
-
-		# Delete a PubSub node (Lots of options still have to be encoded!)
-		def delete_node(node)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-			@pubsub.delete_node(node)
-		end
-
-		# Publish an Item. This infers an item of Jabber::PubSub::Item kind is passed
-		def publish_item(node, item)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-			@pubsub.publish_item_to(node, item)
-		end
-
-		# Publish Simple Item. This is an item with one element and some text to it.
-		def publish_simple_item(node, text)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-
-			item = Jabber::PubSub::Item.new
-			xml = REXML::Element.new('value')
-			xml.text = text
-			item.add(xml)
-			publish_item(node, item)
-		end
-
-		# Publish atom Item. This is an item with one atom entry with title, body and time.
-		def publish_atom_item(node, title, body, time = Time.now)
-			raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
-
-			item = Jabber::PubSub::Item.new
-			entry = REXML::Element.new('entry')
-			entry.add_namespace("http://www.w3.org/2005/Atom")
-			mytitle = REXML::Element.new('title')
-			mytitle.text = title
-			entry.add(mytitle)
-			mybody = REXML::Element.new('body')
-			mybody.text = body
-			entry.add(mybody)
-			published = REXML::Element.new("published")
-			published.text = time.utc.iso8601
-			entry.add(published)
-			item.add(entry)
-			publish_item(node, item)
-		end
-
-		private
-
-		def find_subids_for(node)
-			ret = []
-			pubsubscriptions.each do |subscription|
-				if subscription.node == node
-					ret << subscription.subid
-				end
-			end
-			return ret
-		end
+		private 
 
 		def client=(client)
 			self.roster = nil # ensure we clear the roster, since that's now associated with a different client.
@@ -496,7 +542,7 @@ module Jabber
 			end
 
 			roster.add_subscription_request_callback do |roster_item, presence|
-				roster.accept_subscription(presence.from) if accept_subscriptions?
+				roster.accept_subscription(presence.from) if @subs.accept?
 				changed(:subscription_request)
 				notify_observers(:subscription_request, [roster_item, presence])
 			end
