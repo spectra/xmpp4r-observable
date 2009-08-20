@@ -380,7 +380,7 @@ module Jabber
 		# the message recipient will be set to jid.
 		def deliver(jid, message, type=:chat)
 			contacts(jid) do |friend|
-				unless subscribed_to? friend
+				unless @subs.subscribed_to? friend
 					add(friend.jid)
 					return deliver_deferred(friend.jid, message, type)
 				end
@@ -586,8 +586,6 @@ module Jabber
 				notify_observers(:iq, iq)
 			end
 
-			@presence_updates = {}
-			@presence_mutex = Mutex.new
 			roster.add_presence_callback do |roster_item, old_presence, new_presence|
 				simple_jid = roster_item.jid.strip.to_s
 				presence = case new_presence.type
@@ -597,11 +595,8 @@ module Jabber
 										 nil
 									 end
 
-				if presence && @presence_updates[simple_jid] != presence
-					changed(:presence)
-					notify_observers(:presence, simple_jid)
-					@presence_mutex.synchronize { @presence_updates[simple_jid] = [presence, new_presence.status] }
-				end
+				changed(:presence)
+				notify_observers(:presence, simple_jid, presence, new_presence)
 			end
 		end
 
@@ -615,7 +610,7 @@ module Jabber
 				loop {
 					sleep 3 while @deferred_messages.empty?
 					message = @deferred_messages.deq
-					if subscribed_to?(message[:to])
+					if @subs.subscribed_to?(message[:to])
 						deliver(message[:to], message[:message], message[:type])
 					else
 						@deferred_messages.enq message unless Time.now > (deferred_max_wait + message[:time])
