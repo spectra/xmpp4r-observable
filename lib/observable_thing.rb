@@ -10,7 +10,7 @@ module ObservableThing
 		@things = {} unless defined? @things
 		@things[thing] = {} unless ! @things[thing].nil?
 		unless observer.respond_to? func
-			raise NoMethodsError, "observer does not respond to `#{func.to_s}'"
+			raise NoMethodError, "observer does not respond to `#{func.to_s}'"
 		end
 		@things[thing][observer] = func
 	end
@@ -79,7 +79,8 @@ module ObservableThing
 	end
 
 	# Notify all observers of "thing" about something. This will only be
-	# enforced if the state of that "thing" is true.
+	# enforced if the state of that "thing" is true. Also, if the observer
+	# returns the Symbol :delete_me, it will be deleted after being notified.
 	#
 	# thing:: what has been observed.
 	# args:: notification to be sent to the observers of "thing".
