@@ -1,5 +1,11 @@
-# This was based on Observable module from Ruby
-module FineObservable
+# This was based on Observable module from Ruby.
+module ObservableThing
+
+	# Adds an observer for some "thing".
+	#
+	# thing:: what will be observed.
+	# observer:: the observer.
+	# func:: the observer method that will be called (default: :update).
 	def add_observer(thing, observer, func = :update)
 		@things = {} unless defined? @things
 		@things[thing] = {} unless ! @things[thing].nil?
@@ -9,10 +15,17 @@ module FineObservable
 		@things[thing][observer] = func
 	end
 
+	# Deletes an observer for some "thing".
+	#
+	# thing:: what has been observed.
+	# observer:: the observer.
 	def delete_observer(thing, observer)
 		@things[thing].delete observer if defined? @things and ! @things[thing].nil?
 	end
 
+	# Delete observers for some "thing".
+	#
+	# thing:: what has been observed (if nil, deletes all observers).
 	def delete_observers(thing = nil)
 		if thing.nil?
 			@things.clear if defined? @things
@@ -21,6 +34,9 @@ module FineObservable
 		end
 	end
 
+	# Count the number of observers for some "thing".
+	#
+	# thing:: what has been observed (if nil, count all observers).
 	def count_observers(thing = nil)
 		return 0 if ! defined? @things
 		size = 0
@@ -34,16 +50,26 @@ module FineObservable
 		size
 	end
 
+	# Count the number of notifications for some "thing".
+	#
+	# thing:: what has been observed.
 	def count_notifications(thing)
 		return 0 if (! defined?(@things_counter)) or (! @things_counter.include?(thing))
 		@things_counter[thing]
 	end
 
+	# Change the state of some "thing".
+	#
+	# thing:: what will have the state changed.
+	# state:: the state (default = true).
 	def changed(thing, state = true)
 		@things_state = {} unless defined? @things_state
 		@things_state[thing] = state
 	end
 
+	# Check the state of some "thing".
+	#
+	# thing: what to have its state checked.
 	def changed?(thing)
 		if defined? @things_state and @things_state[thing]
 			true
@@ -52,15 +78,22 @@ module FineObservable
 		end
 	end
 
+	# Notify all observers of "thing" about something. This will only be
+	# enforced if the state of that "thing" is true.
+	#
+	# thing:: what has been observed.
+	# args:: notification to be sent to the observers of "thing".
 	def notify_observers(thing, *arg)
-		if defined? @things_state and @things_state[thing]
+		if changed?(thing)
 			if defined? @things and ! @things[thing].nil?
 				@things[thing].each { |observer, func|
 					increase_counter(thing)
-					observer.send(func, thing, *arg)
+					if observer.send(func, thing, *arg) == :delete_me
+						delete_observer(thing, observer)
+					end
 				}
 			end
-			@things_state[thing] = false
+			changed(thing, false)
 		end
 	end
 

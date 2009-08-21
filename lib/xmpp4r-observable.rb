@@ -30,7 +30,7 @@ require 'xmpp4r/pubsub/helper/nodebrowser'
 require 'xmpp4r/pubsub/helper/nodehelper'
 
 # This will provide us our Notifications system
-require 'fine_observer'
+require 'observable_thing'
 
 module Jabber
 
@@ -308,7 +308,7 @@ module Jabber
 			end
 		end
 
-		include FineObservable
+		include ObservableThing
 
 		attr_reader :subs, :pubsub, :jid
 
