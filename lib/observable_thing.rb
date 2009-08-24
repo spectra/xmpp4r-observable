@@ -1,3 +1,4 @@
+require 'thread_store'
 # This was based on Observable module from Ruby.
 module ObservableThing
 
@@ -89,9 +90,12 @@ module ObservableThing
 			if defined? @things and ! @things[thing].nil?
 				@things[thing].each { |observer, func|
 					increase_counter(thing)
-					if observer.send(func, thing, *arg) == :delete_me
-						delete_observer(thing, observer)
-					end
+					@thread_store = ThreadStore.new if ! defined? @thread_store
+					@thread_store.add Thread.new {
+						if observer.send(func, thing, *arg) == :delete_me
+							delete_observer(thing, observer)
+						end
+					}
 				}
 			end
 			changed(thing, false)
