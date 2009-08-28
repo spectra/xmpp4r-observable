@@ -120,22 +120,26 @@ class TestObservableThing < Test::Unit::TestCase
 
 		self.changed(:one_thing)
 		self.notify_observers(:one_thing, "test")
+		self.wait_notifications
 		assert @observer1.check("observer 1: got an update on one_thing with args = test")
 		assert @observer2.check("observer 2: got an update on one_thing with args = test")
 
 		self.changed(:other_thing)
 		self.notify_observers(:other_thing, "foo", "bar")
+		self.wait_notifications
 		assert @observer1.check("observer 1: got an update on other_thing with args = foo, bar")
 		assert @observer2.check("observer 2: got an update on one_thing with args = test")
 
 		@observer2.delete = true
 		self.changed(:one_thing)
 		self.notify_observers(:one_thing, "foo", "bar")
+		self.wait_notifications
 		assert @observer2.check("observer 2: got an update on one_thing with args = foo, bar")
 		assert @observer1.check("observer 1: got an update on one_thing with args = foo, bar")
 
 		self.changed(:one_thing)
 		self.notify_observers(:one_thing, "fooo", "barr")
+		self.wait_notifications
 		assert @observer2.check("observer 2: got an update on one_thing with args = foo, bar")
 		assert @observer1.check("observer 1: got an update on one_thing with args = fooo, barr")
 

@@ -1,3 +1,4 @@
+$: << File.dirname(__FILE__)
 require 'thread_store'
 # This was based on Observable module from Ruby.
 module ObservableThing
@@ -100,6 +101,17 @@ module ObservableThing
 			end
 			changed(thing, false)
 		end
+	end
+
+	# Is there pending notifications?
+	def pending_notifications?
+		return false if ! defined? @thread_store
+		@thread_store.size > 0
+	end
+
+	# Wait all notifications
+	def wait_notifications
+		sleep 1 while pending_notifications?
 	end
 
 	private

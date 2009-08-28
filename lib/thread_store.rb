@@ -1,7 +1,14 @@
+# Class ThreadStore
 class ThreadStore
+	attr_reader :cycles, :max
+
+	# Create a new ThreadStore.
+	#
+	# max:: max number of threads to store (when exhausted, older threads will
+	# just be killed and discarded).
 	def initialize(max = 100)
-		@store = []
-		@max = max
+		@store  = []
+		@max    = max
 		@cycles = 0
 		@killer_thread = Thread.new do
 			loop do
@@ -16,21 +23,20 @@ class ThreadStore
 		end
 	end
 
+	# :nodoc:
 	def inspect
 		sprintf("#<%s:0x%x @max=%d, @size=%d @cycles=%d>", self.class.name, __id__, @max, size, @cycles)
 	end
 
+	# Add a new thread to the ThreadStore
 	def add(thread)
-		if thread.respond_to?(:alive?)
+		if thread.instance_of?(Thread) and thread.respond_to?(:alive?)
 			@store << thread
-			if @store.length > @max
-				th = @store.shift
-				th.kill
-			end
+			@store.shift.kill while @store.length > @max
 		end
   end
 
-	attr_reader :cycles, :max
+	# How long is our ThreadStore
 	def size; @store.length; end
 
 end # of class ThreadStore
