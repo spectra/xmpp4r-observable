@@ -36,6 +36,11 @@ class ThreadStore
 		end
   end
 
+	# Kill all threads
+	def kill!
+		@store.shift.kill while @store.length > 0
+	end
+
 	# How long is our ThreadStore
 	def size; @store.length; end
 
