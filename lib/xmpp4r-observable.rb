@@ -46,7 +46,7 @@ module Jabber
 		end
 
 		def inspect
-			"<Jabber::Contact:0x#{object_id.to_s(16)} @jid=#{jid.to_s}>"
+			sprintf("#<%s:0x%x @jid=%s>", self.class.name, __id__, @jid.to_s)
 		end
 
 		def subscribed?
@@ -112,9 +112,9 @@ module Jabber
 
 			def inspect	#:nodoc:
 				if has_service?
-					"<Jabber::Observable::PubSub:0x#{object_id.to_s(16)} @service_jid=#{@service_jid}>"
+					sprintf("#<%s:0x%x @service_jid=%s>", self.class.name, __id__, @service_jid)
 				else
-					"<Jabber::Observable::PubSub:0x#{object_id.to_s(16)} @has_service?=false>"
+					sprintf("#<%s:0x%x @has_service?=false>", self.class.name, __id__)
 				end
 			end
 
@@ -341,7 +341,7 @@ module Jabber
 		end
 
 		def inspect # :nodoc:
-			"<Jabber::Observable:0x#{object_id.to_s(16)} @jid=#{@jid}, @delivered_messages=#{@delivered_messages}, @deferred_messages = #{@deferred_messages.length}, @observer_count=#{observer_count}, @notification_count=#{notification_count}, @pubsub=#{@pubsub.inspect}>"
+			sprintf("#<%s:0x%x @jid=%s, @delivered_messages=%d, @deferred_messages=%d, @observer_count=%s, @notification_count=%s, @pubsub=%s>", self.class.name, __id__, @jid, @delivered_messages, @deferred_messages.length, observer_count.inspect, notification_count.inspect, @pubsub.inspect)
 		end
 
 		# Count the registered observers in each thing
@@ -605,7 +605,7 @@ module Jabber
 		# the user hasn't subscribed, we place the message in a queue for later
 		# delivery. Once a user has accepted our authorization request, we deliver
 		# any messages that have been queued up in the meantime.
-		def start_deferred_delivery_thread #:nodoc:
+		def start_deferred_delivery_thread
 			@deferred_delivery_thread = Thread.new {
 				loop {
 					sleep 3 while @deferred_messages.empty?
