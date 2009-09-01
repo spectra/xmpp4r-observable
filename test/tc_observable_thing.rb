@@ -6,13 +6,15 @@ class TestObservableThing < Test::Unit::TestCase
 
 	class Observer
 		attr_accessor :delete
-		def initialize(name)
+		def initialize(name, time = 0)
 			@name = name
 			@last = ""
 			@delete = false
+			@time = time
 		end
 
 		def update(thing, *args)
+			sleep @time if @time > 0
 			@last = "#{@name}: got an update on #{thing} with args = #{args.join(', ')}"
 			return :delete_me if @delete
 		end
@@ -25,6 +27,7 @@ class TestObservableThing < Test::Unit::TestCase
 	def setup
 		@observer1 = Observer.new("observer 1")
 		@observer2 = Observer.new("observer 2")
+		@observer3 = Observer.new("observer 3", 10)
 	end
 
 	def teardown
@@ -144,4 +147,27 @@ class TestObservableThing < Test::Unit::TestCase
 		assert @observer1.check("observer 1: got an update on one_thing with args = fooo, barr")
 
 	end
+
+	def test_pending_notifications?
+		self.add_observer(:delayed_thing, @observer3)
+		1.upto(3) do
+			self.changed(:delayed_thing)
+			self.notify_observers(:delayed_thing, "foo bar")
+		end
+		assert self.pending_notifications?, "should have notifications pending"
+		sleep 15
+		assert ! self.pending_notifications?, "should not have anything pending"
+	end
+
+	def test_wait_notifications
+		time = Time.now
+		self.add_observer(:delayed_thing, @observer3)
+		self.changed(:delayed_thing)
+		self.notify_observers(:delayed_thing, "foo bar")
+		self.wait_notifications
+		dif = Time.now - time
+		assert dif >= 10, "should take around 10 seconds"
+		assert dif < 12, "should not take so long"
+	end
+
 end

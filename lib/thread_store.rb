@@ -5,10 +5,11 @@ class ThreadStore
 	# Create a new ThreadStore.
 	#
 	# max:: max number of threads to store (when exhausted, older threads will
-	# just be killed and discarded).
+	# just be killed and discarded). Default is 100. If 0 or negative no
+	# threads will be discarded until #keep is called.
 	def initialize(max = 100)
 		@store  = []
-		@max    = max
+		@max    = max > 0 ? max : 0
 		@cycles = 0
 		@killer_thread = Thread.new do
 			loop do
@@ -32,9 +33,20 @@ class ThreadStore
 	def add(thread)
 		if thread.instance_of?(Thread) and thread.respond_to?(:alive?)
 			@store << thread
-			@store.shift.kill while @store.length > @max
+			keep(@max) if @max > 0
 		end
   end
+
+	# Keep only the number passed of threads
+	#
+	# n:: number of threads to keep (default to @max if @max > 0)
+	def keep(n = nil)
+		if n.nil?
+			raise StandardError, "You need to pass the number of threads to keep!" if @max == 0
+			n = @max
+		end
+		@store.shift.kill while @store.length > n
+	end
 
 	# Kill all threads
 	def kill!
