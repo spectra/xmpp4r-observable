@@ -1,28 +1,10 @@
+$: <<  File.dirname(__FILE__) + "/../lib"
 require 'test/unit'
-require '../lib/observable_thing'
+require 'observable_thing'
+require 'simple_observer.rb'
 
 class TestObservableThing < Test::Unit::TestCase
 	include ObservableThing
-
-	class Observer
-		attr_accessor :delete
-		def initialize(name, time = 0)
-			@name = name
-			@last = ""
-			@delete = false
-			@time = time
-		end
-
-		def update(thing, *args)
-			sleep @time if @time > 0
-			@last = "#{@name}: got an update on #{thing} with args = #{args.join(', ')}"
-			return :delete_me if @delete
-		end
-
-		def check(str)
-			@last == str
-		end
-	end
 
 	def setup
 		@observer1 = Observer.new("observer 1")
