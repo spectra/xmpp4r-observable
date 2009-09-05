@@ -153,3 +153,50 @@ class TestObservableThing < Test::Unit::TestCase
 	end
 
 end
+
+class TestQObserver < Test::Unit::TestCase
+
+	def setup
+		@qobserver = QObserver.new
+	end
+
+	def teardown
+		@qobserver = nil
+	end
+
+	def test_queues
+		assert @qobserver.queues.empty?
+		@qobserver.update(:thing1, 123)
+		assert_equal 1, @qobserver.queues.length
+		@qobserver.update(:thing2, 123)
+		assert @qobserver.queues.include?(:thing1)
+		assert @qobserver.queues.include?(:thing2)
+	end
+
+	def test_received?
+		assert ! @qobserver.received?(:thing1)
+		@qobserver.update(:thing1, 123)
+		assert @qobserver.received?(:thing1)
+		extract = @qobserver.received(:thing1)
+		assert ! @qobserver.received?(:thing1)
+	end
+
+	def test_received
+		@qobserver.update(:thing1, 123)
+		@qobserver.update(:thing1, 456)
+		assert ! @qobserver.received?(:nothing)
+		extract = @qobserver.received(:thing1)
+		assert_kind_of Array, extract
+		assert extract.include?([123])
+		assert extract.include?([456])
+		assert ! @qobserver.received?(:thing1)
+
+		@qobserver.update(:thing1, 789)
+		@qobserver.update(:thing1, 890)
+		
+		@qobserver.received(:thing1) do |arg|
+			assert [[789], [890]].include?(arg)
+		end
+	end
+
+end

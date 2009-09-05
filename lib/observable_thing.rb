@@ -1,7 +1,8 @@
 $: << File.dirname(__FILE__)
-require 'thread_store'
+
 # This was based on Observable module from Ruby.
 module ObservableThing
+	require 'thread_store'
 
 	# Adds an observer for some "thing".
 	#
@@ -119,5 +120,49 @@ module ObservableThing
 		@things_counter = {} unless defined? @things_counter
 		@things_counter[thing] = 0 unless @things_counter.include?(thing)
 		@things_counter[thing] += 1
+	end
+end
+
+# QObserver - simple observer-to-queue class
+class QObserver
+	require 'thread'
+
+	def initialize
+		@queues = Hash.new
+	end
+
+	# Return the queues we have registered
+	def queues
+		@queues.keys
+	end
+
+	# Received something in this queue?
+	#
+	# q:: queue
+	def received?(q)
+		@queues.include?(q) and ! @queues[q].empty?
+	end
+
+	# Get the contents of the queue in an array (or pass each item to the
+	# given block.
+	#
+	# q:: queue
+	def received(q)
+		return nil if ! @queues.include?(q)
+		if block_given?
+			yield @queues[q].deq while ! @queues[q].empty?
+		else
+			a = []
+			a << @queues[q].deq while ! @queues[q].empty?
+			return a
+		end
+	end
+
+	# update method for our Observer
+	#
+	# thing:: what to be updated
+	def update(thing, *args)
+		@queues[thing] = Queue.new if ! @queues.include?(thing)
+		@queues[thing].enq args
 	end
 end

@@ -310,7 +310,7 @@ module Jabber
 
 		include ObservableThing
 
-		attr_reader :subs, :pubsub, :jid
+		attr_reader :subs, :pubsub, :jid, :auto
 
 		# Create a new Jabber::Observable client. You will be automatically connected
 		# to the Jabber server and your status message will be set to the string
@@ -338,6 +338,9 @@ module Jabber
 
 			# PubSub Accessor
 			@pubsub = PubSub.new(self)
+
+			# Auto Observer placeholder
+			@auto = nil
 		end
 
 		def inspect # :nodoc:
@@ -347,19 +350,39 @@ module Jabber
 		# Count the registered observers in each thing
 		def observer_count
 			h = {}
-			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each { |thing|
+			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each do |thing|
 				h[thing] = count_observers(thing)
-			}
+			end
 			h
 		end
 
 		# Count the notifications really send for each thing
 		def notification_count
 			h = {}
-			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each { |thing|
+			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each do |thing|
 				h[thing] = count_notifications(thing)
-			}
+			end
 			h
+		end
+
+		# Attach an auto-observer based on QObserver
+		def attach_auto_observer
+			raise StandardError, "Already attached." if ! @auto.nil?
+
+			@auto = QObserver.new
+			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each do |thing|
+				self.add_observer(thing, @auto)
+			end
+		end
+
+		# Dettach the auto-observer
+		def dettach_auto_observer
+			raise StandardError, "Not attached." if @auto.nil?
+
+			[ :message, :presence, :iq, :new_subscription, :subscription_request, :event ].each do |thing|
+				self.delete_observer(thing, @auto)
+			end
+			@auto = nil
 		end
 
 		# Send a message to jabber user jid.
