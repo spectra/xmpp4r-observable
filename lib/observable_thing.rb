@@ -131,6 +131,18 @@ class QObserver
 		@queues = Hash.new
 	end
 
+	def inspect
+		h = {}
+		@queues.each do |q, queue|
+			h[q] = queue.size
+		end
+		if h.length > 0
+			sprintf("#<%s:0x%x size=%s>", self.class.name, __id__, h.inspect)
+		else
+			sprintf("#<%s:0x%x>", self.class.name, __id__)
+		end
+	end	
+
 	# Return the queues we have registered
 	def queues
 		@queues.keys
@@ -157,6 +169,13 @@ class QObserver
 			return a
 		end
 	end
+
+	# Get the size of a given queue
+	#
+	# q:: queue
+	def size(q)
+		@queues[q].size rescue 0
+  end
 
 	# update method for our Observer
 	#

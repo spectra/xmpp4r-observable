@@ -21,8 +21,8 @@ class Observer
 	end
 
 	def clear
-		@last.clear
-		@last_args.clear
+		@last.clear if @last.respond_to?(:clear)
+		@last_args.clear if @last_args.respond_to?(:clear)
 	end
 end
 

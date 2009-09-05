@@ -1,3 +1,4 @@
+$: <<  File.dirname(__FILE__)
 $: <<  File.dirname(__FILE__) + "/../lib"
 require 'test/unit'
 require 'timeout'
@@ -59,10 +60,10 @@ class TestJabberObservable < Test::Unit::TestCase
 		@client2.subs.remove(@jid1)
 		@client1.subs.remove(@jid2)
 
-		sleep 3
-
-		assert_equal false, @client1.subs.subscribed_to?(@jid2)
-		assert_equal false, @client2.subs.subscribed_to?(@jid1)
+		assert_before 60 do
+			assert_equal false, @client1.subs.subscribed_to?(@jid2)
+			assert_equal false, @client2.subs.subscribed_to?(@jid1)
+		end
 	end
 
 	def test_add_users_to_our_roster_should_succeed_with_automatic_approval

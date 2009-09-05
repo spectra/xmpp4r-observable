@@ -1,0 +1,87 @@
+= Name
+
+Jabber::Observable - An easy to use, observable Jabber client library with
+PubSub support.
+
+= Synopsis
+
+  # Send a message to a friend, asking for authorization if necessary:
+  im = Jabber::Observable.new("user@example.com", "password")
+  im.deliver("friend@example.com", "Hey there friend!")
+
+  # Register a new observer for incoming messages:
+  observer = SomeObserverClass.new
+  im.add_observer(:message, observer)
+
+  # Unregister the observer:
+  im.delete_observer(:message, observer)
+
+  # Send an authorization request to a user:
+  im.subs.add("friend@example.com")
+
+  # Remove a user from your contact list:
+  im.subs.remove("unfriendly@example.com")
+
+  # Create a PubSub node:
+  im.pubsub.create_node("/mynode")
+
+  # Publishing something to the node:
+  im.pubsub.publish_simple_item("/mynode", "body", "something")
+
+  # Subscribing to a node:
+  im.pubsub.subscribe_to("/othernode")
+
+  # Get my nodes:
+  im.pubsub.my_nodes
+
+  # Get my subscriptions:
+  im.pubsub.subscriptions
+
+  # Register an observer for events on nodes I subscribed to:
+  im.add_observer(:event, observer)
+
+  # Attach an auto-observer (this gets everything that can be observed and
+  # makes it available in queues):
+  im.attach_auto_observer
+
+  # Receive messages via the auto-observer
+  if im.auto.received?(:message)
+    im.auto.received(:message).each do |msg|
+      puts msg.body
+    end
+  end
+
+  # Dettach the auto-observer
+  im.dettach_auto_observer
+
+  # See the Jabber::Observable documentation for more information.
+
+= Description
+
+Jabber::Observable is intended to make Jabber client programming simple and
+poweful. This library exposes common tasks in messaging, subscription handling
+and Publication and Subscription (PubSub) of nodes using a variation of Ruby's
+builtin Observer pattern, lowering the need to monitor queues using threads.
+For those that still want to use threads, there's an auto-observer that can be
+easily attached.
+
+= Copyright
+
+Jabber::Observable - An observable Jabber client library with PubSub support.
+Copyright (C) 2008-2009 Pablo Lorenzzoni <pablo@propus.com.br>.
+
+Based on and inspired by: Jabber::Simple by Blaine Cook <romeda@gmail.com>.
+
+Jabber::Observable is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option) any
+later version.
+
+Jabber::Observable is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+details.
+
+You should have received a copy of the GNU General Public License along with
+Jabber::Observable; if not, write to the Free Software Foundation, Inc., 51
+Franklin St, Fifth Floor, Boston, MA  02110-1301  USA

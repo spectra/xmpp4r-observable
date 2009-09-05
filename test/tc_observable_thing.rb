@@ -199,4 +199,13 @@ class TestQObserver < Test::Unit::TestCase
 		end
 	end
 
+	def test_size
+		@qobserver.update(:thing1, 123)
+		assert_equal 1, @qobserver.size(:thing1)
+		assert_equal 0, @qobserver.size(:thing2)
+
+		@qobserver.received(:thing1)
+		assert_equal 0, @qobserver.size(:thing1)
+	end
+
 end

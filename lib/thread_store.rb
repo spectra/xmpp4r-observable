@@ -24,8 +24,7 @@ class ThreadStore
 		end
 	end
 
-	# :nodoc:
-	def inspect
+	def inspect # :nodoc:
 		sprintf("#<%s:0x%x @max=%d, @size=%d @cycles=%d>", self.class.name, __id__, @max, size, @cycles)
 	end
 

@@ -1,5 +1,6 @@
+$: <<  File.dirname(__FILE__) + "/../lib"
 require 'test/unit'
-require '../lib/thread_store'
+require 'thread_store'
 
 class TestThreadStore < Test::Unit::TestCase
 	def setup
