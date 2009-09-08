@@ -1,0 +1,7 @@
+xmpp4r-observable (0.5.1)
+
+  * Added .gemspec, README, COPYING and Rakefile.
+  * Bump version to 0.5.1 for github release (first public release).
+  * Not all is covered by tests, but all that is covered passes.
+
+ -- Pablo Lorenzzoni <pablo@propus.com.br>  Mon, 07 Sep 2009 21:01:58 -0300
