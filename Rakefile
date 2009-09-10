@@ -53,5 +53,6 @@ if defined? Rcov
 	Rcov::RcovTask.new do |t|
 		t.test_files = FileList['test/tc_*.rb'] 
 		t.rcov_opts << "--sort coverage"
+		t.rcov_opts << "--exclude 'rubygems/*'"
 	end
 end

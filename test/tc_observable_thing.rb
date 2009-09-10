@@ -1,7 +1,8 @@
+$: <<  File.dirname(__FILE__)
 $: <<  File.dirname(__FILE__) + "/../lib"
 require 'test/unit'
 require 'observable_thing'
-require 'simple_observer.rb'
+require 'simple_observer'
 
 class TestObservableThing < Test::Unit::TestCase
 	include ObservableThing
