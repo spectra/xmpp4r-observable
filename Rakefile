@@ -54,5 +54,7 @@ if defined? Rcov
 		t.test_files = FileList['test/tc_*.rb'] 
 		t.rcov_opts << "--sort coverage"
 		t.rcov_opts << "--exclude 'rubygems/*'"
+		t.rcov_opts << "--exclude 'gems/*'"
+		t.rcov_opts << "--no-rcovrt"
 	end
 end

@@ -50,6 +50,7 @@ class TestThreadStore < Test::Unit::TestCase
 		assert_equal 10, @ts.size
 		sleep 15
 		assert_equal 0, @ts.size
+		assert @ts.cycles != 0
 	end
 
 	def test_kill!
@@ -70,6 +71,14 @@ class TestThreadStore < Test::Unit::TestCase
 		assert_equal 100, @ts.size
 		@ts.keep(50)
 		assert_equal 50, @ts.size
+		assert_raise StandardError do
+			@ts.keep
+		end
+	end
+
+	def test_inspect
+		assert_kind_of String, @ts.inspect
+		assert /cycles/.match(@ts.inspect)
 	end
 
 end
