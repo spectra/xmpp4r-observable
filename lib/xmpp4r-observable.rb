@@ -180,22 +180,39 @@ module Jabber
 			# Create a PubSub node (Lots of options still have to be encoded!)
 			def create_node(node)
 				raise_noservice if ! has_service?
-				@helper.create_node(node)
+				begin
+					@helper.create_node(node)
+				rescue => e
+					raise e
+					return nil
+				end
+				@my_nodes << node if defined? @my_nodes
+				node
 			end
 	
 			# Return an array of noes I own
 			def my_nodes
-				ret = []
-				subscriptions.each do |sub|
-					ret << sub.node if sub.attributes['affiliation'] == 'owner'
+				if ! defined? @my_nodes
+					ret = []
+					subscriptions.each do |sub|
+						 ret << sub.node if sub.attributes['affiliation'] == 'owner'
+					end
+					@my_nodes = ret
 				end
-				return ret
+				return @my_nodes
 			end
 	
 			# Delete a PubSub node (Lots of options still have to be encoded!)
 			def delete_node(node)
 				raise_noservice if ! has_service?
-				@helper.delete_node(node)
+				begin
+					@helper.delete_node(node)
+				rescue => e
+					raise e
+					return nil
+				end
+				@my_nodes.delete(node) if defined? @my_nodes
+				node
 			end
 	
 			# Publish an Item. This infers an item of Jabber::PubSub::Item kind is passed
