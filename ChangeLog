@@ -1,3 +1,9 @@
+xmpp4r-observable (0.5.2)
+
+  * #pubsub@my_nodes was taking a long time since it retrieves all
+  subscriptions every time. Now we're managing it within @my_nodes, defined in
+  the first call to it... So just the first call take a long time.
+
 xmpp4r-observable (0.5.1)
 
   * Added .gemspec, README, COPYING and Rakefile.
