@@ -1,7 +1,7 @@
 Gem::Specification.new do |s| 
   s.add_dependency('xmpp4r', '>= 0.5.0')
   s.name = "xmpp4r-observable" 
-  s.version = "0.5.2" 
+  s.version = "0.5.3" 
   s.author = "Pablo Lorenzoni" 
   s.email = "pablo@propus.com.br" 
   s.homepage = "http://www.nardol.org/" 

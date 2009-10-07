@@ -1,6 +1,12 @@
+xmpp4r-observable (0.5.3)
+
+  * Added #pubsub.get_items_from (had to reimplement it so OpenFire gets
+  happy).
+  * Added #pubsub.is_subscribed_to? as a convenience method.
+
 xmpp4r-observable (0.5.2)
 
-  * #pubsub@my_nodes was taking a long time since it retrieves all
+  * #pubsub.my_nodes was taking a long time since it retrieves all
   subscriptions every time. Now we're managing it within @my_nodes, defined in
   the first call to it... So just the first call take a long time.
 

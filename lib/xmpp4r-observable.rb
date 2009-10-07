@@ -201,6 +201,15 @@ module Jabber
 				end
 				return @my_nodes
 			end
+
+			# Return true if we're subscribed to that node
+			def is_subscribed_to?(node)
+				ret = false
+				subscriptions.each do |sub|
+					ret = true if sub.node == node and sub.attributes['subscription'] == 'subscribed'
+				end
+				return ret
+			end
 	
 			# Delete a PubSub node (Lots of options still have to be encoded!)
 			def delete_node(node)
@@ -250,6 +259,41 @@ module Jabber
 				entry.add(published)
 				item.add(entry)
 				publish_item(node, item)
+			end
+
+			# Get items from a node
+			def get_items_from(node, count = nil)
+				raise_noservice if ! has_service?
+
+				if is_subscribed_to?(node)
+					# FIXME
+					# @helper.get_items_from(node, count)
+					# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+					# The above should just work, but I had to reimplement it since OpenFire (the Jabber Server
+					# I am testing against) seems to require subids for nodes we're subscribed to.
+					subids = find_subids_for(node)
+					iq = Jabber::Iq.new(:get, @service_jid)
+					iq.add(Jabber::PubSub::IqPubSub.new)
+					iq.from = @observable.jid
+					items = Jabber::PubSub::Items.new
+					items.node = node
+					items.max_items = count
+					items.subid = subids[0]
+					iq.pubsub.add(items)
+					res = nil
+					@observable.client.send_with_id(iq) { |reply|
+						if reply.kind_of?(Jabber::Iq) and reply.pubsub and reply.pubsub.first_element('items')
+							res = {}
+							reply.pubsub.first_element('items').each_element('item') do |item|
+								res[item.attributes['id']] = item.children.first if item.children.first
+							end
+						end
+						true
+					}
+					res
+				else
+					@helper.get_items_from(node, count)
+				end
 			end
 	
 			private
