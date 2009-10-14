@@ -101,6 +101,10 @@ module Jabber
 				@observable = observable
 
 				@helper = @service_jid = nil
+				attach!
+			end
+
+			def attach!
 				begin
 					domain = Jabber::JID.new(@observable.jid).domain
 					@service_jid = "pubsub." + domain
@@ -108,6 +112,7 @@ module Jabber
 				rescue
 					@helper = @service_jid = nil
 				end
+				return has_service?
 			end
 
 			def inspect	#:nodoc:
@@ -123,16 +128,20 @@ module Jabber
 				! @helper.nil?
 			end
 	
-			# Sets the PubSub service. Just one service is allowed.
+			# Sets the PubSub service. Just one service is allowed. If nil, reset.
 			def set_service(service)
-				raise NotConnected, "You are not connected" if ! @observable.connected?
-				raise AlreadySet, "You already have a PubSub service (#{@service_jid})." if has_service?
-				@helper = Jabber::PubSub::ServiceHelper.new(@observable.client, service)
-				@service_jid = service
-	
-				@helper.add_event_callback do |event|
-					@observable.changed(:event)
-					@observable.notify_observers(:event, event)
+				if service.nil?
+					@helper = @service_jid = nil
+				else
+					raise NotConnected, "You are not connected" if ! @observable.connected?
+					raise AlreadySet, "You already have a PubSub service (#{@service_jid})." if has_service?
+					@helper = Jabber::PubSub::ServiceHelper.new(@observable.client, service)
+					@service_jid = service
+
+					@helper.add_event_callback do |event|
+						@observable.changed(:event)
+						@observable.notify_observers(:event, event)
+					end
 				end
 			end
 	
@@ -628,6 +637,12 @@ module Jabber
 			# Post-connect
 			register_default_callbacks
 			status(@presence, @status_message)
+			if ! @pubsub.nil?
+				@pubsub.attach!
+			else
+				@pubsub = PubSub.new(self)
+			end
+
 			@connect_mutex.unlock
 		end
 
@@ -641,6 +656,7 @@ module Jabber
 				end
 			end
 			client = nil
+			@pubsub.set_service(nil)
 			@disconnected = auto_reconnect
 		end
 
