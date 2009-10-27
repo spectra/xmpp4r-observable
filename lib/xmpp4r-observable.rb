@@ -101,6 +101,7 @@ module Jabber
 				@observable = observable
 
 				@helper = @service_jid = nil
+				@disco = Jabber::Discovery::Helper.new(@observable.client)
 				attach!
 			end
 
@@ -148,7 +149,7 @@ module Jabber
 			# Subscribe to a node.
 			def subscribe_to(node)
 				raise_noservice if ! has_service?
-				@helper.subscribe_to(node)
+				@helper.subscribe_to(node) unless is_subscribed_to?(node)
 			end
 	
 			# Unsubscribe from a node.
@@ -199,7 +200,7 @@ module Jabber
 				node
 			end
 	
-			# Return an array of noes I own
+			# Return an array of nodes I own
 			def my_nodes
 				if ! defined? @my_nodes
 					ret = []
@@ -209,6 +210,30 @@ module Jabber
 					@my_nodes = ret
 				end
 				return @my_nodes
+			end
+
+			# Return true if a given node exists
+			def node_exists?(node)
+				ret = []
+				if ! defined? @existing_nodes or ! @existing_nodes.include?(node)
+					# We'll renew @existing_nodes if we haven't got it the first time
+					reply = @disco.get_items_for(@service_jid)
+					reply.items.each do |item|
+						ret << item.node
+					end
+					@existing_nodes = ret
+				end
+				return @existing_nodes.include?(node)
+			end
+
+			# Returns an array of nodes I am subscribed to
+			def subscribed_nodes
+				ret = []
+				subscriptions.each do |sub|
+					next if sub.node.nil?
+					ret << sub.node if sub.attributes['subscription'] == 'subscribed' and ! my_nodes.include?(sub.node)
+				end
+				return ret
 			end
 
 			# Return true if we're subscribed to that node
@@ -709,6 +734,7 @@ module Jabber
 			@deferred_delivery_thread = Thread.new {
 				loop {
 					sleep 3 while @deferred_messages.empty?
+					sleep 3
 					message = @deferred_messages.deq
 					if @subs.subscribed_to?(message[:to])
 						deliver(message[:to], message[:message], message[:type])

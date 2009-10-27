@@ -1,8 +1,9 @@
 xmpp4r-observable (0.5.4)
 
   * Fixed #pubsub.* behaviour on #disconnect / #connect
+  * Added #pubsub.node_exists?
 
- -- Pablo Lorenzzoni <pablo@propus.com.br>  Wed, 14 Oct 2009 16:51:11 2009 -0300
+ -- Pablo Lorenzzoni <pablo@propus.com.br>  Wed, 27 Oct 2009 15:51:11 2009 -0200
 
 xmpp4r-observable (0.5.3)
 

@@ -15,7 +15,7 @@ module ObservableThing
 		unless observer.respond_to? func
 			raise NoMethodError, "observer does not respond to `#{func.to_s}'"
 		end
-		@things[thing][observer] = func
+		@things[thing][observer] = func unless @things[thing].include?(observer)
 	end
 
 	# Deletes an observer for some "thing".
